@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+ 
+enum Role {
+  ADMIN
+  HOSPITAL_STAFF
+ 
+  @@map("user_role")
+}
+ 
+enum AvailabilityStatus {
+  AVAILABLE
+  LIMITED
+  UNAVAILABLE
+ 
+  @@map("availability_status")
+}
+ 
+model Hospital {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(200)
+  address   String   @db.VarChar(300)
+  state     String   @db.VarChar(60)
+  lga       String?  @db.VarChar(100)
+  lat       Float
+  lng       Float
+  phone     String?  @db.VarChar(30)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ 
+  users        User[]
+  availability Availability[]
+ 
+  @@index([state])
+  @@index([lat, lng])
+  @@map("hospitals")
+}
+ 
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         Role     @default(HOSPITAL_STAFF)
+  hospitalId   Int?     @map("hospital_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+ 
+  hospital Hospital? @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  updates  Availability[]
+ 
+  @@index([hospitalId])
+  @@map("users")
+}
+ 
+model Equipment {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique @db.VarChar(150)
+  category String? @db.VarChar(100)
+ 
+  availability Availability[]
+ 
+  @@map("equipment")
+}
+ 
+model Availability {
+  id          Int                @id @default(autoincrement())
+  hospitalId  Int                @map("hospital_id")
+  equipmentId Int                @map("equipment_id")
+  status      AvailabilityStatus @default(AVAILABLE)
+  quantity    Int?
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedById Int?               @map("updated_by")
+ 
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+ 
+  @@unique([hospitalId, equipmentId], name: "uq_hospital_equipment")
+  @@index([equipmentId, status])
+  @@index([updatedAt])
+  @@map("availability")
+}
